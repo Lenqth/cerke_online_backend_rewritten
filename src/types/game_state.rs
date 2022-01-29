@@ -248,13 +248,19 @@ impl GameState {
                     let move_to_be_polled = self.get_last_move_mut().unwrap();
                     match &mut move_to_be_polled.mov {
                         MoveToBePolled::InfAfterStep { src, step, coord_signifying_planned_direction, stepping_ciurl, final_result } => {
-                            if let Some(result) = dest.map(|dest_coord| FinalResult { 
-                                dest: dest_coord,
-                                water_entry_ciurl: ciurl.clone(),
-                                thwarted_by_failing_water_entry_ciurl: ciurl.clone()
-                            }) {
-                                final_result.replace(result);
-                            }
+                            let result = match dest {
+                                Some(dest_coord) =>  FinalResult { 
+                                    dest: dest_coord,
+                                    water_entry_ciurl: ciurl.clone(),
+                                    thwarted_by_failing_water_entry_ciurl: ciurl.clone()
+                                },
+                                None =>  FinalResult { 
+                                    dest: src.clone(),
+                                    water_entry_ciurl: None,
+                                    thwarted_by_failing_water_entry_ciurl: None
+                                },
+                            };
+                            final_result.replace(result);
                         },
                         _ => {
                             unreachable!("Invalid MoveToBePolled");

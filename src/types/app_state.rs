@@ -212,40 +212,14 @@ impl AppState {
         let game_state: &mut GameState = room_to_gamestate
             .get_mut(&room_info.room_id)
             .expect("FIXME: cannot happen");
+        let turn_player = game_state.state.whose_turn();
 
         let ia_side = room_info.is_ia_down_for_me;
         if ia_side != game_state.is_ia_owner_s_turn() { 
             return RetTaXot::Err;
         }
 
-        if let Phase::Moved(state) = &game_state.state {
-            let state_resolved = cetkaik_full_state_transition::resolve(&state, game_state.config);
-            if let HandResolved::HandExists { if_taxot, if_tymok }  = state_resolved {
-                game_state.state = match if_taxot {
-                    cetkaik_full_state_transition::IfTaxot::NextSeason(p_state) => {
-                        Phase::Start(p_state.choose().0)
-                    },
-                    cetkaik_full_state_transition::IfTaxot::VictoriousSide(_) => {
-                        return RetTaXot::Ok { 
-                            is_first_move_my_move: None
-                        }
-                    },
-                };
-                
-                let mut whos_go_first = WhoGoesFirst::new(&mut rand::thread_rng());
-                if whos_go_first.result != game_state.is_ia_owner_s_turn() {
-                    whos_go_first = whos_go_first.not();
-                }
-
-                RetTaXot::Ok { 
-                    is_first_move_my_move: Some(whos_go_first)
-                }
-            } else { 
-                RetTaXot::Err
-            }
-        } else {
-            RetTaXot::Err
-        }
+        game_state.apply_taxot(turn_player == cetkaik_core::absolute::Side::IASide)
     }
 
     pub fn reply_to_whether_tymok_poll(
@@ -306,7 +280,8 @@ impl AppState {
             };
 
             if let Phase::Start(state) = &game_state.state {
-                println!("{:#?}", game_state.state.whose_turn());
+                let turn_player = game_state.state.whose_turn();
+                println!("{:#?}", turn_player);
                 let bot = crate::bot::bot_move(state, game_state.config);
 
                 match bot.bot_move {
@@ -333,7 +308,7 @@ impl AppState {
                     Phase::AfterCiurl(_) => todo!(),
                     Phase::Moved(state) => {
                         if state.tam2tysak2_will_trigger_taxottymok {
-                            game_state.apply_taxot();
+                            game_state.apply_taxot(turn_player == cetkaik_core::absolute::Side::IASide);
                         } else {
                             game_state.apply_resolve();
                         }

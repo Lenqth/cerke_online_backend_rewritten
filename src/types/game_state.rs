@@ -4,7 +4,7 @@ use cetkaik_full_state_transition::{Config, message::{AfterHalfAcceptance, InfAf
 
 use crate::types::FinalResult;
 
-use super::{Ciurl, MovePiece, MoveToBePolled, NonTamMoveDotData, Phase, RetAfterHalfAcceptance, RetInfAfterStep, RetNormalMove, RetTaXot, SrcStep, TamMoveInternal, WhoGoesFirst};
+use super::{Ciurl, MovePiece, MoveToBePolled, NonTamMoveDotData, Phase, RetAfterHalfAcceptance, RetInfAfterStep, RetNormalMove, RetTaXot, RetTyMok, SrcStep, TamMoveInternal, WhoGoesFirst};
 
 #[derive(Debug)]
 pub struct GameState {
@@ -284,10 +284,29 @@ impl GameState {
 
     }
 
-    pub fn apply_tymok (&mut self) {
+    pub fn apply_tymok (&mut self, i_am_ia: bool) -> RetTyMok {
+        if i_am_ia != self.is_ia_owner_s_turn() { 
+            return RetTyMok::Err;
+        }
+        
+        if let Phase::Moved(state) = &self.state {
+            let state_resolved = cetkaik_full_state_transition::resolve(&state, self.config);
+            if let HandResolved::HandExists { if_taxot, if_tymok } = state_resolved {
+                self.state = Phase::Start(if_tymok);
+                RetTyMok::Ok
+            } else { 
+                RetTyMok::Err
+            }
+        } else {
+            RetTyMok::Err
+        }
         
     }
-    pub fn apply_taxot (&mut self) -> RetTaXot {
+    pub fn apply_taxot (&mut self, i_am_ia: bool) -> RetTaXot {
+        if i_am_ia != self.is_ia_owner_s_turn() { 
+            return RetTaXot::Err;
+        }
+
         if let Phase::Moved(state) = &self.state { 
             let state_resolved = cetkaik_full_state_transition::resolve(&state, self.config);
             if let HandResolved::HandExists { if_taxot, if_tymok }  = state_resolved {
@@ -307,6 +326,10 @@ impl GameState {
                     whos_go_first = whos_go_first.not();
                 }
                 *(self.is_first_move_ia_move.lock().unwrap().get_mut(self.state.get_season().to_index()).unwrap()) = Some(whos_go_first.clone());
+
+                if !i_am_ia {
+                    whos_go_first = whos_go_first.not();
+                }
 
                 RetTaXot::Ok { 
                     is_first_move_my_move: Some(whos_go_first)
